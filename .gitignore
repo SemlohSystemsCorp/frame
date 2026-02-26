@@ -24,6 +24,9 @@
 .DS_Store
 *.pem
 
+# Claude Code settings (may contain sensitive data)
+.claude/
+
 # debug
 npm-debug.log*
 yarn-debug.log*
