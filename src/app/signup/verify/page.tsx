@@ -148,7 +148,7 @@ export default function VerifyPage() {
           )}
         </div>
 
-        <div className="rounded-2xl border border-border bg-card p-8 shadow-sm">
+        <div className="rounded border border-border bg-card p-8 shadow-sm">
           <p className="text-sm text-center text-muted-foreground mb-6">
             Enter the code below. It expires in 15 minutes.
           </p>
@@ -170,7 +170,7 @@ export default function VerifyPage() {
                 onKeyDown={(e) => handleKeyDown(i, e)}
                 disabled={loading}
                 aria-label={`Digit ${i + 1}`}
-                className={`w-12 h-14 text-center text-xl font-bold rounded-xl border-2 bg-background outline-none transition focus:border-primary focus:ring-2 focus:ring-ring disabled:opacity-50 ${
+                className={`w-12 h-14 text-center text-xl font-bold rounded border-2 bg-background outline-none transition focus:border-primary focus:ring-2 focus:ring-ring disabled:opacity-50 ${
                   error ? "border-destructive" : digit ? "border-primary" : "border-border"
                 }`}
               />
