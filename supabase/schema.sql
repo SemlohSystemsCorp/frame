@@ -2,22 +2,30 @@
 -- WARNING: Drops and recreates all tables. All data will be lost.
 
 -- =========================================================
--- Drop everything (reverse dependency order)
+-- Drop everything safely (handles fresh DB with no tables)
 -- =========================================================
 
--- Drop triggers first
-drop trigger if exists trg_comment_count on public.comments;
-drop trigger if exists trg_post_vote_count on public.post_votes;
-drop trigger if exists trg_post_count on public.posts;
-drop trigger if exists trg_member_count on public.community_members;
+do $$ begin
+  drop trigger if exists trg_comment_count on public.comments;
+exception when others then null; end $$;
 
--- Drop functions
+do $$ begin
+  drop trigger if exists trg_post_vote_count on public.post_votes;
+exception when others then null; end $$;
+
+do $$ begin
+  drop trigger if exists trg_post_count on public.posts;
+exception when others then null; end $$;
+
+do $$ begin
+  drop trigger if exists trg_member_count on public.community_members;
+exception when others then null; end $$;
+
 drop function if exists public.update_comment_count() cascade;
 drop function if exists public.update_post_vote_count() cascade;
 drop function if exists public.update_post_count() cascade;
 drop function if exists public.update_member_count() cascade;
 
--- Drop tables (cascade handles policies + constraints)
 drop table if exists public.comments cascade;
 drop table if exists public.post_votes cascade;
 drop table if exists public.posts cascade;
@@ -50,7 +58,6 @@ create policy "Own write"
 
 -- =========================================================
 -- verification_codes
--- Deleted after use or expiry — never exposed to anon clients.
 -- =========================================================
 create table public.verification_codes (
   id            uuid primary key default gen_random_uuid(),
@@ -273,7 +280,3 @@ $$;
 create trigger trg_post_vote_count
   after insert or update or delete on public.post_votes
   for each row execute function public.update_post_vote_count();
-
--- Scheduled cleanup of expired verification codes (requires pg_cron extension)
--- select cron.schedule('cleanup-expired-codes', '*/15 * * * *',
---   $$delete from public.verification_codes where expires_at < now()$$);

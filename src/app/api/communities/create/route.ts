@@ -86,9 +86,9 @@ export async function POST(request: NextRequest) {
         { status: 409 }
       );
     }
-    console.error("Community insert error:", communityError);
+    console.error("Community insert error:", communityError.code, communityError.message, communityError.details);
     return NextResponse.json(
-      { error: "Failed to create community." },
+      { error: "Failed to create community: " + communityError.message },
       { status: 500 }
     );
   }
