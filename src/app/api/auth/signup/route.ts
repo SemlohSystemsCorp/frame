@@ -1,7 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { resend } from "@/lib/resend";
 import crypto from "crypto";
+
+// Always use the service role — this is a server-only route and bypasses RLS correctly
+function adminClient() {
+  return createServiceClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  );
+}
 
 function generateCode(): string {
   return String(crypto.randomInt(100000, 999999));
@@ -21,7 +30,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Missing required fields." }, { status: 400 });
   }
 
-  const supabase = await createClient();
+  const supabase = adminClient();
 
   // Check if username is already taken
   const { data: existingUsername, error: usernameErr } = await supabase
@@ -33,7 +42,7 @@ export async function POST(request: NextRequest) {
   if (usernameErr) {
     console.error("profiles query error:", usernameErr);
     return NextResponse.json(
-      { error: "Database error — have you run supabase/schema.sql? " + usernameErr.message },
+      { error: "Database error: " + usernameErr.message },
       { status: 500 }
     );
   }
@@ -55,7 +64,7 @@ export async function POST(request: NextRequest) {
   if (pendingErr) {
     console.error("verification_codes query error:", pendingErr);
     return NextResponse.json(
-      { error: "Database error — have you run supabase/schema.sql? " + pendingErr.message },
+      { error: "Database error: " + pendingErr.message },
       { status: 500 }
     );
   }
@@ -64,7 +73,6 @@ export async function POST(request: NextRequest) {
   const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
 
   if (existingPending) {
-    // Refresh the existing code
     await supabase
       .from("verification_codes")
       .update({ code, expires_at: expiresAt, attempts: 0 })
@@ -117,11 +125,9 @@ async function sendEmail(email: string, username: string, code: string) {
       <div style="font-family: Georgia, serif; max-width: 480px; margin: 0 auto; padding: 40px 24px; color: #1a1a1a;">
         <h1 style="font-size: 24px; font-weight: 700; color: #1a1a1a; margin: 0 0 4px;">Frame</h1>
         <p style="color: #666; margin: 0 0 32px; font-size: 13px;">Verify your email address</p>
-
         <p style="font-size: 15px; line-height: 1.6; margin: 0 0 24px;">
           Hi <strong>${username}</strong>, here's your verification code:
         </p>
-
         <div style="background: #f5f5f5; border: 1px solid #e0e0e0; border-radius: 6px; padding: 28px; text-align: center; margin: 0 0 32px;">
           <span style="font-size: 40px; font-weight: 700; letter-spacing: 12px; color: #1a1a1a; font-family: monospace;">
             ${code}
@@ -130,7 +136,6 @@ async function sendEmail(email: string, username: string, code: string) {
             This code expires in <strong>15 minutes</strong>.
           </p>
         </div>
-
         <p style="font-size: 13px; color: #999; line-height: 1.6;">
           If you didn't request this, you can safely ignore this email.
         </p>
