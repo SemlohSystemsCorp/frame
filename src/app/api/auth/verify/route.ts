@@ -1,15 +1,29 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient as createServiceClient } from "@supabase/supabase-js";
+
+function adminClient() {
+  return createServiceClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  );
+}
 
 export async function POST(request: NextRequest) {
-  const body = await request.json();
-  const { email, code } = body as { email: string; code: string };
+  let body: { email?: string; code?: string };
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
+  }
+
+  const { email, code } = body;
 
   if (!email || !code) {
     return NextResponse.json({ error: "Missing required fields." }, { status: 400 });
   }
 
-  const supabase = await createClient();
+  const supabase = adminClient();
 
   const { data: record, error: fetchError } = await supabase
     .from("verification_codes")
@@ -17,8 +31,16 @@ export async function POST(request: NextRequest) {
     .eq("email", email)
     .maybeSingle();
 
-  if (fetchError || !record) {
-    return NextResponse.json({ error: "No pending signup found for this email." }, { status: 404 });
+  if (fetchError) {
+    console.error("verification_codes fetch error:", fetchError);
+    return NextResponse.json({ error: "Database error." }, { status: 500 });
+  }
+
+  if (!record) {
+    return NextResponse.json(
+      { error: "No pending signup found for this email." },
+      { status: 404 }
+    );
   }
 
   // Check expiry
@@ -53,15 +75,7 @@ export async function POST(request: NextRequest) {
   }
 
   // Code is correct — create the Supabase auth user
-  // Use service role so we can bypass email confirmation
-  const { createClient: createServiceClient } = await import("@supabase/supabase-js");
-  const adminSupabase = createServiceClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { autoRefreshToken: false, persistSession: false } }
-  );
-
-  const { data: authData, error: authError } = await adminSupabase.auth.admin.createUser({
+  const { data: authData, error: authError } = await supabase.auth.admin.createUser({
     email: record.email,
     password: record.password_hash,
     email_confirm: true,
@@ -77,29 +91,35 @@ export async function POST(request: NextRequest) {
       );
     }
     console.error("Auth createUser error:", authError);
-    return NextResponse.json({ error: "Failed to create account. Please try again." }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to create account. Please try again." },
+      { status: 500 }
+    );
   }
 
   // Create profile row
   if (authData.user) {
-    await adminSupabase.from("profiles").insert({
+    const { error: profileError } = await supabase.from("profiles").insert({
       id: authData.user.id,
       username: record.username,
       email: record.email,
     });
+    if (profileError) {
+      console.error("Profile insert error:", profileError);
+    }
   }
 
   // Delete the verification code — it's been used
   await supabase.from("verification_codes").delete().eq("email", email);
 
-  // Sign the user in and return session
-  const { data: sessionData, error: sessionError } = await adminSupabase.auth.signInWithPassword({
+  // Sign the user in
+  const { data: sessionData, error: sessionError } = await supabase.auth.signInWithPassword({
     email: record.email,
     password: record.password_hash,
   });
 
   if (sessionError || !sessionData.session) {
-    // Account created — just redirect to login
+    // Account created but couldn't auto-login — send to login page
     return NextResponse.json({ ok: true, redirect: "/login" });
   }
 

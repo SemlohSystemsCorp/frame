@@ -1,9 +1,19 @@
 -- Run this in your Supabase SQL editor (Dashboard > SQL Editor)
+-- WARNING: This drops and recreates all tables. All data will be lost.
+
+-- =========================================================
+-- Drop everything
+-- =========================================================
+drop policy if exists "Public read" on public.profiles;
+drop policy if exists "Own write" on public.profiles;
+drop table if exists public.profiles cascade;
+
+drop table if exists public.verification_codes cascade;
 
 -- =========================================================
 -- profiles
 -- =========================================================
-create table if not exists public.profiles (
+create table public.profiles (
   id          uuid primary key references auth.users(id) on delete cascade,
   username    text not null unique,
   email       text not null unique,
@@ -28,7 +38,7 @@ create policy "Own write"
 -- Stores pending signups until the user enters the code.
 -- Deleted automatically after verification or expiry.
 -- =========================================================
-create table if not exists public.verification_codes (
+create table public.verification_codes (
   id            uuid primary key default gen_random_uuid(),
   email         text not null unique,
   username      text not null,

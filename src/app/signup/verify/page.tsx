@@ -23,7 +23,6 @@ export default function VerifyPage() {
       return;
     }
     setEmail(stored);
-    // Focus first input
     setTimeout(() => inputRefs.current[0]?.focus(), 100);
   }, [router]);
 
@@ -85,6 +84,8 @@ export default function VerifyPage() {
       setError(data.error ?? "Something went wrong.");
       if (data.expired) {
         sessionStorage.removeItem("signup_email");
+        sessionStorage.removeItem("signup_username");
+        sessionStorage.removeItem("signup_password");
         setTimeout(() => router.push("/signup"), 2500);
       }
       // Clear digits on wrong code
@@ -97,6 +98,8 @@ export default function VerifyPage() {
 
     setSuccess(true);
     sessionStorage.removeItem("signup_email");
+    sessionStorage.removeItem("signup_username");
+    sessionStorage.removeItem("signup_password");
     setTimeout(() => router.push(data.redirect ?? "/"), 1500);
   }
 
@@ -105,11 +108,13 @@ export default function VerifyPage() {
     setResending(true);
     setError(null);
 
-    // We re-use the signup route which refreshes the code
+    const username = sessionStorage.getItem("signup_username") ?? "";
+    const password = sessionStorage.getItem("signup_password") ?? "";
+
     const res = await fetch("/api/auth/signup", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, username: "resend", password: "resend" }),
+      body: JSON.stringify({ email, username, password }),
     });
 
     setResending(false);

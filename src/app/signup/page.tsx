@@ -110,6 +110,8 @@ export default function SignupPage() {
     }
 
     sessionStorage.setItem("signup_email", form.email.trim().toLowerCase());
+    sessionStorage.setItem("signup_username", form.username.trim());
+    sessionStorage.setItem("signup_password", form.password);
     router.push("/signup/verify");
   }
 
